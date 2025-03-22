@@ -1,103 +1,75 @@
-import numpy as np
+"""
+Herramientas Computacionales: El Arte de la Programación
+
+Evidencia de Proyecto
+
+Miguel de Jesús Degollado Macías|A01255388.
+
+Docente: Baldomero Olvera Villanueva
+
+Fecha: 23/03/2025
+ """
+import numpy as np 
 import cv2
 import matplotlib.pyplot as plt
+import os
 
+# Función para aplicar convolución a una imagen
 def convolution(image: np.ndarray, kernel: np.ndarray, average: bool = False, verbose: bool = False) -> np.ndarray:
-    """
-    Aplica una convolución a una imagen en escala de grises o a color procesando cada canal por separado.
 
-    Parámetros:
-        image (np.ndarray): Imagen de entrada (grayscale o color).
-        kernel (np.ndarray): Kernel de convolución (matriz 2D).
-        average (bool): Si es True, normaliza el kernel.
-        verbose (bool): Si es True, muestra imágenes intermedias.
-
-    Retorna:
-        np.ndarray: Imagen procesada después de la convolución.
-    """
-    
-    # Si la imagen tiene 3 canales (es a color), procesamos cada canal por separado
-    if image.ndim == 3:
-        print(f"Imagen con 3 canales detectada: {image.shape}")
-        channels = cv2.split(image)  # Separamos los canales B, G y R
-        # Aplicamos la convolución en cada canal por separado
+    if image.ndim == 3:  # Si la imagen tiene 3 dimensiones (color)
+        channels = cv2.split(image)  # Separa los canales de color (R, G, B)
         processed_channels = [convolution(ch, kernel, average, verbose) for ch in channels]
-        return cv2.merge(processed_channels)  # Volvemos a unir los canales procesados
+        return cv2.merge(processed_channels)  # Une los canales procesados
 
-    print(f"Procesando imagen en escala de grises. Tamaño: {image.shape}")
-    print(f"Kernel Shape: {kernel.shape}")
-
-    # Muestra la imagen original si verbose está activado
-    if verbose:
-        plt.imshow(image, cmap='gray')
-        plt.title("Imagen Original")
-        plt.show()
-
-    # Obtiene dimensiones de la imagen y del kernel
+    # Obtiene dimensiones de la imagen y el kernel
     image_row, image_col = image.shape
     kernel_row, kernel_col = kernel.shape
-
-    # Calcula el tamaño del padding necesario para la convolución
-    pad_h, pad_w = kernel_row // 2, kernel_col // 2
-    # Agrega padding de ceros alrededor de la imagen para evitar pérdida de información en los bordes
+    pad_h, pad_w = kernel_row // 2, kernel_col // 2  # Calcula el padding necesario
+    
+    # Aplica padding a la imagen para evitar pérdida de bordes
     padded_image = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), mode='constant', constant_values=0)
+    output = np.zeros_like(image, dtype=np.float32)  # Crea una matriz de salida vacía
 
-    # Muestra la imagen con padding si verbose está activado
-    if verbose:
-        plt.imshow(padded_image, cmap='gray')
-        plt.title("Imagen con Padding")
-        plt.show()
-
-    # Crea una matriz vacía para almacenar la imagen de salida
-    output = np.zeros_like(image, dtype=np.float32)
-
-    # Aplica la convolución recorriendo cada píxel de la imagen original
+    # Itera sobre cada píxel de la imagen y aplica la convolución
     for row in range(image_row):
         for col in range(image_col):
-            # Extrae la región de la imagen del mismo tamaño que el kernel
-            region = padded_image[row:row + kernel_row, col:col + kernel_col]
-            # Aplica la convolución sumando los valores multiplicados
-            output[row, col] = np.sum(region * kernel)
-            # Si average es True, normaliza dividiendo por el tamaño del kernel
+            region = padded_image[row:row + kernel_row, col:col + kernel_col]  # Extrae la región
+            output[row, col] = np.sum(region * kernel)  # Aplica el filtro
             if average:
-                output[row, col] /= kernel.size
+                output[row, col] /= kernel.size  # Normaliza si es necesario
 
-    print(f"Tamaño de la imagen de salida: {output.shape}")
+    return np.clip(output, 0, 255).astype(np.uint8)  # Asegura valores entre 0 y 255
 
-    # Muestra la imagen procesada si verbose está activado
-    if verbose:
-        plt.imshow(output, cmap='gray')
-        plt.title(f"Imagen Procesada con {kernel_row}x{kernel_col} Kernel")
-        plt.show()
+# Diccionario con diferentes filtros predefinidos
+filters = {
+    "Bordes": np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.float32),  # Resalta bordes
+    "Desenfoque": np.ones((5, 5), dtype=np.float32) / 25,  # Suaviza la imagen
+    "Realce": np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32),  # Realza detalles
+    "Emboss": np.array([[-2, -1, 0], [-1, 1, 1], [0, 1, 2]], dtype=np.float32)  # Efecto de relieve
+}
 
-    # Asegura que los valores estén en el rango de 0 a 255 y convierte a entero sin signo
-    return np.clip(output, 0, 255).astype(np.uint8)
+# Carpeta donde se guardarán las imágenes procesadas
+output_dir = "Fotos_convolucion"
+os.makedirs(output_dir, exist_ok=True)  # Crea la carpeta si no existe
 
-
-# Solicita al usuario el nombre del archivo de la imagen
+# Solicita el nombre del archivo de imagen al usuario
 image_name = input("Ingrese el nombre de la imagen (con extensión, por ejemplo, 'imagen.jpg'): ")
+image = cv2.imread(image_name)  # Carga la imagen
 
-# Carga la imagen desde el archivo ingresado
-image = cv2.imread(image_name)
-
-# Verifica si la imagen se cargó correctamente
 if image is None:
-    print("Error: No se pudo cargar la imagen. Verifique el nombre del archivo y la ubicación.")
+    print("Error: No se pudo cargar la imagen.")  # Manejo de error si la imagen no se encuentra
 else:
-    # Define un kernel de ejemplo para detección de bordes
-    kernel = np.array([[-1, -1, -1], 
-                       [-1,  8, -1], 
-                       [-1, -1, -1]], dtype=np.float32)
-
-    # Aplica la convolución a la imagen
-    result = convolution(image, kernel, verbose=True)
-
-    # Guarda la imagen procesada con un nuevo nombre
-    output_name = "imagen_procesada.jpg"
-    cv2.imwrite(output_name, result)
-    print(f"Imagen procesada guardada como {output_name}")
-
-    # Muestra la imagen procesada con matplotlib
-    plt.imshow(result, cmap='gray')
-    plt.title("Imagen Procesada")
-    plt.show()
+    plt.figure(figsize=(10, 10))  # Configura el tamaño de la figura para visualizar imágenes
+    for i, (filter_name, kernel) in enumerate(filters.items(), 1):
+        result = convolution(image, kernel)  # Aplica el filtro
+        output_name = os.path.join(output_dir, f"imagen_{filter_name.lower()}.jpg")  # Nombre del archivo de salida
+        cv2.imwrite(output_name, result)  # Guarda la imagen procesada
+        print(f"Imagen con filtro {filter_name} guardada en {output_name}")
+        
+        # Muestra cada imagen con su respectivo filtro
+        plt.subplot(2, 2, i)  # Organiza en una cuadrícula de 2x2
+        plt.imshow(result, cmap='gray')  # Muestra la imagen en escala de grises
+        plt.title(f"Filtro: {filter_name}")  # Título con el nombre del filtro
+        plt.axis('off')  # Oculta los ejes para mejor visualización
+    plt.show()  # Muestra las imágenes procesadas
